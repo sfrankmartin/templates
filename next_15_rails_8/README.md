@@ -21,8 +21,7 @@ docker compose up -d
 Install packages and start Next.js development server:
 
 ```bash
-pnpm install # root level dependencies
-pnpm --filter ./frontend install
+pnpm install # at project root
 pnpm --filter ./frontend dev
 ```
 
