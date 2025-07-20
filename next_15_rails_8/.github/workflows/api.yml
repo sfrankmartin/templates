@@ -1,0 +1,51 @@
+name: API CI
+
+on:
+  push:
+    branches: [main]
+    paths: 
+      - 'backend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/api.yml'
+  pull_request:
+    branches: [main]
+    paths: 
+      - 'backend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/api.yml'
+
+jobs:
+  rspec:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_USER: projectname
+          POSTGRES_PASSWORD: projectname_pw
+          POSTGRES_DB: projectname_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U projectname"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+    
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.4.1
+          bundler-cache: true
+          working-directory: backend
+
+      - name: Run RSpec
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://projectname:projectname_pw@localhost:5432/budgetprojectname_test
+          RAILS_ENV: test
+        run: |
+          bundle exec rails db:create db:schema:load
+          bundle exec rspec --format progress
