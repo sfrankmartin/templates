@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Configurable exclude list (use directory or file names, but not paths - node_modules matches *any* node_modules dir)
+EXCLUDE_LIST=(
+  ".git"
+  "node_modules"
+  ".next"
+  "vendor"
+  "*.png"
+  "*.jpg"
+  "*.jpeg"
+  "*.ico"
+  "*.pdf"
+  "*.ttf"
+  "*.woff"
+)
+
+function usage() {
+  echo "Usage: $0 templatename newprojectname"
+  exit 1
+}
+
+# Validate args
+if [[ $# -ne 2 ]]; then
+  usage
+fi
+
+TEMPLATE_NAME="$1"
+NEW_PROJECT_NAME="$2"
+SRC_DIR="./$TEMPLATE_NAME"
+DEST_DIR="../$NEW_PROJECT_NAME"
+
+if [[ ! -d "$SRC_DIR" ]]; then
+  echo "Error: template '$TEMPLATE_NAME' does not exist."
+  exit 1
+fi
+
+if [[ -e "$DEST_DIR" ]]; then
+  echo "Error: destination '$DEST_DIR' already exists."
+  exit 1
+fi
+
+# Prompt replacements
+echo "Proposed string replacements:"
+read -rp "Replace 'projectname' with [default: $NEW_PROJECT_NAME]: " REPL_LOWER
+CAPITALIZED_PROJECT_NAME="$(echo "$NEW_PROJECT_NAME" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
+read -rp "Replace 'ProjectName' with [default: $CAPITALIZED_PROJECT_NAME]: " REPL_CAPITAL
+UPPER_PROJECT_NAME="$(echo "$NEW_PROJECT_NAME" | tr '[:lower:]' '[:upper:]')"
+read -rp "Replace 'PROJECTNAME' with [default: $UPPER_PROJECT_NAME]: " REPL_UPPER
+
+REPL_LOWER="${REPL_LOWER:-$NEW_PROJECT_NAME}"
+REPL_CAPITAL="${REPL_CAPITAL:-$CAPITALIZED_PROJECT_NAME}"
+REPL_UPPER="${REPL_UPPER:-$UPPER_PROJECT_NAME}"
+
+echo
+echo "Final replacements:"
+echo "  projectname  → $REPL_LOWER"
+echo "  ProjectName  → $REPL_CAPITAL"
+echo "  PROJECTNAME  → $REPL_UPPER"
+read -rp "Continue with these replacements? (y/n) " CONFIRM
+[[ "$CONFIRM" =~ ^[Yy]$ ]] || exit 0
+
+# Copy template while excluding unwanted directories
+rsync -av --progress "$SRC_DIR/" "$DEST_DIR/" \
+  --exclude 'node_modules' \
+  --exclude '.git' \
+  --exclude '.next' \
+  --exclude 'vendor'
+
+# Build the find command with pruning
+PRUNE_PATHS=()
+for pattern in "${EXCLUDE_LIST[@]}"; do
+  PRUNE_PATHS+=(-path "$DEST_DIR/**/$pattern" -o)
+done
+
+echo "Performing replacements in $DEST_DIR..."
+
+find "$DEST_DIR" \( "${PRUNE_PATHS[@]}" -false \) -prune -o -type f -print | while read -r file; do
+  # Only process text files
+  if file "$file" | grep -qE 'text'; then
+    BEFORE_HASH=$(md5 -q "$file")
+    LC_ALL=C sed -i '' \
+      -e "s/projectname/$REPL_LOWER/g" \
+      -e "s/ProjectName/$REPL_CAPITAL/g" \
+      -e "s/PROJECTNAME/$REPL_UPPER/g" \
+      "$file"
+    AFTER_HASH=$(md5 -q "$file")
+    if [[ "$BEFORE_HASH" != "$AFTER_HASH" ]]; then
+      echo "✅ Updated: ${file#$DEST_DIR/}"
+    fi
+  else
+    echo "⏭️  Skipped (binary): ${file#$DEST_DIR/}"
+  fi
+done
+
+echo "✅ Project '$NEW_PROJECT_NAME' scaffolded successfully at $DEST_DIR"
