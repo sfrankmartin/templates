@@ -56,6 +56,7 @@ export default [
     files: ['**/*.{ts,tsx}'],
     rules: {
       'no-undef': 'off', // <── kills the “React is not defined” error
+      '@next/next/no-page-custom-font': 'off', // <-- kills the Custom Font warning (we are not using Pages router)
     },
   },
 ];
