@@ -44,7 +44,7 @@ jobs:
       - name: Run RSpec
         working-directory: backend
         env:
-          DATABASE_URL: postgres://projectname:projectname_pw@localhost:5432/budgetprojectname_test
+          DATABASE_URL: postgres://projectname:projectname_pw@localhost:5432/projectname_test
           RAILS_ENV: test
         run: |
           bundle exec rails db:create db:schema:load
